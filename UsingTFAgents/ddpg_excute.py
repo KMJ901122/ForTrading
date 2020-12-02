@@ -20,7 +20,7 @@ tf.compat.v1.enable_v2_behavior()
 
 # Hyperparmeters
 factor=1
-ddpg_num_iterations=int(factor*100000)
+ddpg_num_iterations=int(factor*10000)
 policy_num_iterations=10
 
 ddpg_initial_collect_steps=int(factor*1000)
@@ -29,7 +29,7 @@ collect_episodes_per_iteration=2
 ddpg_replay_buffer_capacity=int(factor*1000)
 policy_replay_buffer_capacity=2000
 
-batch_size = 64  # @param {type:"integer"}
+batch_size = 32  # @param {type:"integer"}
 
 critic_learning_rate = 3e-4  # @param {type:"number"}
 actor_learning_rate = 3e-4  # @param {type:"number"}
@@ -41,8 +41,14 @@ gamma = 0.99  # @param {type:"number"}
 reward_scale_factor = 1.0  # @param {type:"number"}
 gradient_clipping = None  # @param
 
-actor_fc_layer_params = (64, 64)
-critic_joint_fc_layer_params = (64, 64)
+actor_fc_layer_params = (128, 128)
+critic_joint_fc_layer_params = (128, 128)
+
+preprocessing_layers=tf.keras.models.Sequential(
+[tf.keras.layers.Conv1D(10, 5),
+tf.keras.layers.LSTM(64),
+tf.keras.layers.Flatten()
+])
 
 ddpg_log_interval = int(factor * 5000)  # @param {type:"integer"}
 policy_log_interval = 25  # @param {type:"integer"}
@@ -52,10 +58,10 @@ ddpg_eval_interval = int(factor * 10000)  # @param {type:"integer"}
 policy_eval_interval = 50  # @param {type:"integer"}
 
 datadir=r'C:\Users\DELL\Desktop\data\csv\Korea\Samsung.csv'
-train_states, eval_states=StatesPreprocess(datadir, reward_length=10)
+train_states, eval_states=StatesPreprocess(datadir, window=20, reward_length=10)
 
-train_py_env=StockEnv(train_states, discrete=False)
-eval_py_env=StockEnv(eval_states, discrete=False)
+train_py_env=StockEnv(train_states, discrete=False, delay=True)
+eval_py_env=StockEnv(eval_states, discrete=False, delay=True)
 
 train_env=tf_py_environment.TFPyEnvironment(train_py_env)
 eval_env=tf_py_environment.TFPyEnvironment(eval_py_env)
@@ -64,7 +70,7 @@ def train_and_evaluate_agent_ddpg(tf_agent, name='agent'):
     tf_agent.initialize()
 
     eval_policy=greedy_policy.GreedyPolicy(tf_agent.policy)
-    collect_policy=gaussian_policy.GaussianPolicy(tf_agent.collect_policy)
+    collect_policy=greedy_policy.GreedyPolicy(tf_agent.collect_policy)
 
     replay_buffer=tf_uniform_replay_buffer.TFUniformReplayBuffer(
     data_spec=tf_agent.collect_data_spec,
@@ -123,13 +129,8 @@ def train_and_evaluate_agent_ddpg(tf_agent, name='agent'):
 
     steps_list = [r[0] for r in returns]
     rewards_list = [r[1] for r in returns]
-    return steps_list, rewards_list
 
-    # plt.plot(steps_list, rewards_list)
-    # plt.ylabel('Average Return')
-    # plt.xlabel('Step')
-    # plt.title(name)
-    # plt.show()
+    return steps_list, rewards_list
 
 from tf_agents.agents.ddpg import ddpg_agent, actor_network, critic_network
 
@@ -147,6 +148,7 @@ critic_net = critic_network.CriticNetwork(
     joint_fc_layer_params=critic_joint_fc_layer_params)
 
 global_step = tf.compat.v2.Variable(0)
+
 tf_agent = ddpg_agent.DdpgAgent(
     train_env.time_step_spec(),
     train_env.action_spec(),
@@ -164,4 +166,10 @@ tf_agent = ddpg_agent.DdpgAgent(
     gradient_clipping=gradient_clipping,
     train_step_counter=global_step)
 
-# train_and_evaluate_agent_ddpg(tf_agent, name='ddpg')
+step_list, reward_list=train_and_evaluate_agent_ddpg(tf_agent, name='ddpg')
+
+plt.plot(steps_list, rewards_list)
+plt.ylabel('Average Return')
+plt.xlabel('Step')
+plt.title('ddpg')
+plt.show()
