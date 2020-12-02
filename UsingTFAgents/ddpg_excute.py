@@ -168,7 +168,7 @@ tf_agent = ddpg_agent.DdpgAgent(
 
 step_list, reward_list=train_and_evaluate_agent_ddpg(tf_agent, name='ddpg')
 
-plt.plot(steps_list, rewards_list)
+plt.plot(step_list, reward_list)
 plt.ylabel('Average Return')
 plt.xlabel('Step')
 plt.title('ddpg')
