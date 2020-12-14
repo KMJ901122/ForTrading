@@ -3,6 +3,7 @@ from tf_agents.trajectories import trajectory
 from tf_agents.utils import common
 from tf_agents.drivers import dynamic_step_driver, dynamic_episode_driver
 from tf_agents.policies import greedy_policy, random_tf_policy, gaussian_policy
+from tf_agents.policies.policy_saver import PolicySaver
 from Evaluations import compute_avg_return
 
 def train_and_evaluate_ACagent(tf_agent, train_env=None, eval_env=None, num_iterations=None, batch_size=32, replay_buffer_capacity=1000, name='agent'):
@@ -48,7 +49,10 @@ def train_and_evaluate_ACagent(tf_agent, train_env=None, eval_env=None, num_iter
 
     # Evalute the agent's policy once before training
     avg_return=compute_avg_return(eval_env, eval_policy)
+    train_return=compute_avg_return(train_env, eval_policy)
     returns=[(0, avg_return)]
+    losses=[]
+    train_returns=[train_return]
 
     for _ in range(num_iterations):
         # Collect a few steps using collect_policy and svae to the replay buffer.
@@ -63,19 +67,28 @@ def train_and_evaluate_ACagent(tf_agent, train_env=None, eval_env=None, num_iter
 
         step=tf_agent.train_step_counter.numpy()
 
-        log_interval=int(num_iterations/20)
-        eval_interval=int(num_iterations/10)
+        log_interval=50
+        eval_interval=50
 
         if step % log_interval == 0:
             print('step = {0}: loss = {1}'.format(step, train_loss.loss))
+            losses.append((step, train_loss.loss))
 
         if step % eval_interval == 0:
             eval_policy=tf_agent.policy
-            avg_return = compute_avg_return(eval_env, eval_policy)
+            avg_return=compute_avg_return(eval_env, eval_policy)
+            train_avg_return=compute_avg_return(train_env, eval_policy)
+
             print('step = {0}: Average Return = {1}'.format(step, avg_return))
             returns.append((step, avg_return))
+            train_returns.append(train_avg_return)
 
-    steps_list = [r[0] for r in returns]
-    rewards_list = [r[1] for r in returns]
+    saver=PolicySaver(tf_agent.policy, batch_size=None)
+    saver.save(r'C:\Users\DELL\Desktop\Python\\'+name+"policy_%d" %step)
 
-    return steps_list, rewards_list, name
+    steps_list=[r[0] for r in returns]
+    rewards_list=[r[1] for r in returns]
+    loss_steps_list=[l[0] for l in losses]
+    loss_list=[l[1] for l in losses]
+
+    return steps_list, rewards_list, name, loss_steps_list, loss_list, train_returns

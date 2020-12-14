@@ -1,44 +1,57 @@
 from __future__ import absolute_import
 import pandas as pd
 import seaborn as sns
+import numpy as np
+import matplotlib.pyplot as plt
 
-class plots(object):
-    def __init__(self, df):
-        self.df=df
+def generate_point(data, positions):
+    x_short=[]
+    x_long=[]
+    for x in positions:
+        if x[0]==-1.0:
+            x_short.append(x[1])
+        else:
+            x_long.append(x[1])
 
-    def v_plot(self, mean=None, std=None):
-        df=self.df
-        print(type(self.df))
-        print('Check whether type of data is pandas.DataFrame or not')
+    y_long=[data[t] for t in x_long]
+    y_short=[data[t] for t in x_short]
+    return x_short, y_short, x_long, y_long
 
-        if mean==None or std==None:
-            print('initial mean or std is none')
-            mean=self.df.mean()
-            std=self.df.std()
-            print('mean is ', mean)
-            print('std is', std)
+def plot_point(data_1, profit, x_short, y_short, x_long, y_long, title='Samsung'):
+    fig, ax=plt.subplots(1, 1, figsize=(12, 12))
+    plt.xlim([0, len(data_1)-1])
+    plt.scatter(x_long, y_long, c='blue', s=100)
+    plt.scatter(x_short, y_short, c='red', s=100)
+    plt.plot(data_1)
+    plt.xlabel('Days')
+    plt.ylabel('Price')
+    plt.title(title)
+    buy_and_hold=int(data_1[-1]-data_1[0])
+    textstr='Profit: {}\nBuy and Hold: {}'.format(profit, buy_and_hold)
+    textbox = offsetbox.AnchoredText(textstr, loc=1)
+    ax.add_artist(textbox)
 
-        df=(df-mean)/std
-        df=df.melt(var_name='Column', value_name='Normalized')
-        import matplotlib.pyplot as plt
-        # import seaborn as sns
+    # plt.text('Buy and hold: {}'.format(data_1[-1]-data_1[0]))
+    # plt.figure(figsize=(15, 15))
+    # plt.xlim([0, len(data_2)-1])
+    # plt.scatter(x_long_2, y_long_2, c='blue', s=100)
+    # plt.scatter(x_short_2, y_short_2, c='red', s=100)
+    # plt.subplot(212)
+    # plt.plot(data_2)
+    plt.show()
 
-        plt.figure(figsize=(12, 6))
-        # 아래가 문제임
-        return df
-        # ax=(self.sns).violinplot(x='Column', y='Normalized', data=df)
-        # _ = ax.set_xticklabels(df.keys(), rotation=90)
-        # print(df.columns)
-        # print('plt.show()')
-        # plt.show()
+'''
+Usage example
+plot_point(data, 'Samsung', *generate_point(data, positions))
+'''
 
+def plot_compare(step_list, list, name=None):
+    if name==None:
+        raise ValueError("name is None! Determine whether name is loss or reward")
+    for i in range(len(list)):
+        plt.plot(step_list, list[i][0], label=list[i][1])
 
-datadir=r'C:\Users\DELL\Desktop\data\csv\Korea\Samsung.csv'
-data=pd.read_csv(datadir)
-v_tools=plots(data)
-df=v_tools.v_plot()
-# print(df.columns)
-ax=sns.violinplot(x=df.columns[0], y=df.columns[1], data=df)
-_ = ax.set_xticklabels(df.keys(), rotation=90)
-plt.show()
-# v_plot(data)
+    plt.ylabel(name)
+    plt.xlabel('Step')
+    plt.legend(loc='upper left')
+    plt.show()

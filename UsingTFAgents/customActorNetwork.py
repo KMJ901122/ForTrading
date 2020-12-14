@@ -10,7 +10,7 @@ import tf_agents.trajectories.time_step as ts
 
 class CustomActorNetwork(network.Network):
     def __init__(self, observation_spec, action_spec, preprocessing_layers=None,
-    preprocessing_combiner=None, conv_layer_params=None, fc_layer_params=(128, 128),
+    preprocessing_combiner=None, conv_layer_params=None, fc_layer_params=(64, 64),
     dropout_layer_params=None, activation_fn=tf.keras.activations.relu, enable_last_layer_zero_initializer=False,
     name='CustomActorNetwork'):
         super().__init__(input_tensor_spec=observation_spec, state_spec=(), name=name)
@@ -18,9 +18,10 @@ class CustomActorNetwork(network.Network):
         self._action_spec=action_spec
         flat_action_spec=tf.nest.flatten(action_spec)
         self._single_action_spec=flat_action_spec[0]
+        kernel_initializer = tf.compat.v1.keras.initializers.glorot_uniform()
 
-        kernel_initializer=tf.keras.initializers.VarianceScaling(
-        scale=1./3., mode='fan_in', distribution='uniform')
+        # kernel_initializer=tf.keras.initializers.VarianceScaling(
+        # scale=1./3., mode='fan_in', distribution='uniform')
 
         self._encoder=encoding_network.EncodingNetwork(
         observation_spec, preprocessing_layers=preprocessing_layers,
@@ -32,11 +33,12 @@ class CustomActorNetwork(network.Network):
         kernel_initializer=kernel_initializer,
         batch_squash=False)
 
-        initializer=tf.keras.initializers.RandomUniform(-0.3, 0.3)
+        initializer=tf.keras.initializers.RandomUniform(-0.001, 0.001)
+
         self._action_projection_layer=tf.keras.layers.Dense(
         flat_action_spec[0].shape.num_elements(), activation=tf.keras.activations.tanh, kernel_initializer=initializer, name='action')
 
-    def call(self, observations, step_type=(), network_state=()):
+    def call(self, observations, step_type=(), network_state=(), training=False, mask=None):
         outer_rank=nest_utils.get_outer_rank(observations, self.input_tensor_spec)
         batch_squash=utils.BatchSquash(outer_rank)
         observations=tf.nest.map_structure(batch_squash.flatten, observations)
@@ -130,9 +132,10 @@ if __name__=='__main__':
     from tf_agents.policies.policy_saver import PolicySaver
 
     weights=actor.variables
+
     # print(weights)
-    print(type(weights))
-    print(len(weights))
+    # print(type(weights))
+    # print(len(weights))
     # tensor=tf.zeros_like(weights.shape)
     # print(tensor)
     # actor.get_initial_state(tensor)

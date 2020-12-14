@@ -16,6 +16,7 @@ class StockEnv(py_environment.PyEnvironment):
         self.delay_counter=0
         self.delay_threshold=5
         self.eval=eval
+        self.actions=[]
 
         if delay:
             if not eval:
@@ -24,7 +25,7 @@ class StockEnv(py_environment.PyEnvironment):
             else:
                 print('Evaluation Environment"s Action delay implemented')
                 print('Evaluation Environment"s Default delay threshold is ', self.delay_threshold)
-                
+
         if discrete:
             self._action_spec = array_spec.BoundedArraySpec(
             shape=(), dtype=np.int32, minimum=-1, maximum=1, name='action') # sell hold buy
@@ -52,6 +53,8 @@ class StockEnv(py_environment.PyEnvironment):
         self.action_counter=0
         self.delay_counter=0
         self.curr_position=0
+        self.actions=[]
+
         self._state = self.states[0][:-1]
         self._episode_ended = False
 
@@ -65,30 +68,33 @@ class StockEnv(py_environment.PyEnvironment):
         if self.delay:
             if self.delay_counter<self.delay_threshold:
                 self.delay_counter+=1
-                self.total_reward*=1.+raw_reward*self.curr_position
+                self.total_reward*=(1.+(raw_reward*self.curr_position))
             else:
                 if self.curr_position==tf.sign(action): # action not changed
-                    self.total_reward*=1.+raw_reward*self.curr_position
+                    self.total_reward*=(1.+(raw_reward*self.curr_position))
                 else: # action changed; so delay counter reset
+                    self.curr_position=tf.sign(action)
+                    self.actions.append([self.curr_position.numpy(), self.time_flow])
                     self.delay_counter=0
                     self.total_reward*=reward
-                    self.curr_position=tf.sign(action)
                     self.action_counter+=1
 
         else:
             self.total_reward*=reward
             if self.curr_position*tf.sign(action)<0: # position changed
                 self.action_counter+=1
-
+                self.actions.append([tf.sign(action).numpy(), self.time_flow])
             self.curr_position=tf.sign(action) # current position changed
 
         self.time_flow+=1
 
         if self.time_flow==self.states.shape[0]:
             termination=ts.termination(np.array(self._state, dtype=np.float32), reward)
-            if self.eval==True:
-                print('action counter is ', self.action_counter)
-                print('total reward during training', self.total_reward)
+            print('action counter is ', self.action_counter)
+            print('total reward during training', self.total_reward)
+            # if self.eval==True:
+            #     print('action counter is ', self.action_counter)
+            print('where actions have done?', self.actions)
             self.reset()
             return termination
         else:
@@ -118,20 +124,40 @@ if __name__=='__main__':
     time_step_spec=ts.time_step_spec(time_step.observation, time_step.reward)
     action_spec=train_env.action_spec()
 
-    preprocessing_layers=tf.keras.models.Sequential(
-    [tf.keras.layers.Reshape((20, 1)),
-    tf.keras.layers.Conv1D(10, 5),
-    tf.keras.layers.LSTM(64),
-    tf.keras.layers.Flatten()
-    ])
-
-    actor=CustomActorNetwork(train_env.observation_spec(), train_env.action_spec(), preprocessing_layers=preprocessing_layers)
-    policy=actor_policy.ActorPolicy(time_step_spec=time_step_spec, action_spec=action_spec, actor_network=actor, clip=True)
-    action_step=policy.action(time_step)
+    ''' actor experiment '''
+    # preprocessing_layers=tf.keras.models.Sequential(
+    # [tf.keras.layers.Reshape((20, 1)),
+    # tf.keras.layers.Conv1D(10, 5),
+    # tf.keras.layers.LSTM(64),
+    # tf.keras.layers.Flatten()
+    # ])
+    #
+    # actor=CustomActorNetwork(train_env.observation_spec(), train_env.action_spec(), preprocessing_layers=preprocessing_layers)
+    # policy=actor_policy.ActorPolicy(time_step_spec=time_step_spec, action_spec=action_spec, actor_network=actor, clip=True)
+    # action_step=policy.action(time_step)
     # investigate actor!
     # print(time_step_spec)
-    episode_return = 1.
+    # episode_return = 1.
 
-    while not time_step.is_last():
-        action_step = policy.action(time_step)
-        time_step = eval_env.step(action_step.action)
+    # while not time_step.is_last():
+    #     action_step = policy.action(time_step)
+    #     time_step = eval_env.step(action_step.action)
+
+    ''' saved model test '''
+
+    imported=tf.saved_model.load(r'C:\Users\DELL\Desktop\Python\policy_100')
+    f=imported.signatures['serving_deafult']
+    print(f(x=tf.constant([[1.]])))
+
+    # saved_policy=tf.compat.v2.saved_model.load(r'C:\Users\DELL\Desktop\Python\policy_100')
+    # get_initial_state_fn=saved_policy.signatures['get_initial_state']
+    # action_fn=saved_policy.signatures['action']
+    # policy_state_dict=get_initial_state_fn(batch_size=tf.TensorSpec(shape=(), dtype=tf.int32, name='batch_size'))
+    #
+    # # policy_state=saved_policy.get_initial_state(tf.TensorSpec(shape=(), dtype=tf.int32, name='batch_size'))
+    #
+    # while not time_step.is_last():
+    #     policy_step=saved_policy.action(time_step, policy_state)
+    #     policy_state=policy_step.state
+    #     # action_step = policy.action(time_step)
+    #     time_step = eval_env.step(policy_step.action)
